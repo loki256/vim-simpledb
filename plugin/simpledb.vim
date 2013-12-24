@@ -7,6 +7,7 @@ function! s:GetQuery(first, last)
       let query .= line . "\n"
     endif
   endfor
+
   return query
 endfunction
 
@@ -32,11 +33,14 @@ function! simpledb#ExecuteSql() range
   let adapter = matchlist(conprops, 'db:\(\w\+\)')
   let conprops = substitute(conprops, "db:\\w\\+", "", "")
   let query = s:GetQuery(a:firstline, a:lastline)
+  redir! > /tmp/vim-simpledb-query.sql
+  silent echo query
+  redir END
 
   if len(adapter) > 1 && adapter[1] == 'mysql'
-    let cmdline = s:MySQLCommand(conprops, query)
+    let cmdline = s:MySQLCommand(conprops)
   else
-    let cmdline = s:PostgresCommand(conprops, query)
+    let cmdline = s:PostgresCommand(conprops)
   endif
 
   silent execute '!(' . cmdline . ' > /tmp/vim-simpledb-result.txt) 2> /tmp/vim-simpledb-error.txt'
@@ -45,17 +49,13 @@ function! simpledb#ExecuteSql() range
   redraw!
 endfunction
 
-function! s:MySQLCommand(conprops, query)
-  let sql_text = shellescape(a:query)
-  let sql_text = escape(sql_text, '%')
-  let cmdline = 'echo -e ' . sql_text . '| mysql -v -v -v -t ' . a:conprops
+function! s:MySQLCommand(conprops)
+  let cmdline = 'mysql -v -v -v -t ' . a:conprops . ' < /tmp/vim-simpledb-query.sql'
   return cmdline
 endfunction
 
-function! s:PostgresCommand(conprops, query)
-  let sql_text = shellescape('\\timing on \\\ ' . a:query)
-  let sql_text = escape(sql_text, '%')
-  let cmdline = 'echo -e ' . sql_text . '| psql ' . a:conprops
+function! s:PostgresCommand(conprops)
+  let cmdline = 'psql ' . a:conprops . ' < /tmp/vim-simpledb-query.sql'
   return cmdline
 endfunction
 
